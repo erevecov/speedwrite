@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+</head>
+<body>
+    
+    <div class="container">
+        <div class="row">
+            <div class="col" id="originalText"></div>
+        </div>
+    </div>
+
+    <script
+  src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="
+  crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@7.28.11/dist/sweetalert2.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        let socket = io('http://localhost:3455')
+        let myName = ''
+        let insultos = ['NOOB', 'LAMMER', 'OWNED', 'DUMBASS', 'JERK', 'WHORE', 'PUSSY', 'WHORE']
+
+        socket.on('login', function(data){
+            if(data){
+                swal({
+                    title: 'Ingrese su nombre de usuario',
+                    input: 'text',
+                    inputAttributes: {
+                        autocapitalize: 'off'
+                    },
+                    showCancelButton: true,
+                    confirmButtonText: 'Iniciar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: (login) => {
+                        return new Promise(resolve=>{
+                            socket.emit('login', login)
+
+                            socket.on('successLogin', function(loginRes){
+                                myName = loginRes.user
+                                resolve(loginRes)
+                            })
+
+                            socket.on('errLogin', function(loginRes){
+                                resolve(loginRes)
+                            })
+                        })
+                    },
+                    allowOutsideClick: () => !swal.isLoading()
+                }).then((result) => {
+                    console.log(result)    
+                    if (result.value.ok) {
+                        swal({
+                            type: 'success',
+                            title: `Bienvenido ${result.value.user}`,
+                            text: 'A competir!',
+                            timer: 2000
+                        }).then(result=>{
+                            if (result) {
+                                socket.emit('initGame', myName)
+                            }
+                        })
+                    } else if(result.value.err) {
+                        swal({
+                            type: 'error',
+                            title: 'Oops...',
+                            text: `El usuario ${result.value.user} ya está registrado`
+                        })
+                    }
+                })
+            }
+        })
+
+        socket.on('gameArr', function(data) {
+            let splittedText = data.text.trim().split(/\s+/);
+            let currentCounter = 0
+            let totalCounter = splittedText.length
+
+            splittedTextReduce = splittedText.reduce((txt,el,i)=>{
+                return txt += `
+                    <span style="border:1px solid rgba(189, 195, 199,0.5);" id="speedwrite-${i}">${el}</span>
+                ` 
+            }, '')
+
+            $('#originalText').html(`
+            <div class="jumbotron jumbotron-fluid">
+                <div class="container">
+                    <h1 class="display-4">${data.title}</h1>
+                    <div class="lead">${splittedTextReduce}</div>
+                </div>
+                <br>
+
+                <input id="inputWrite" type="text" placeholder="">
+            </div>
+            `)
+            
+            $('#inputWrite').focus()
+            $(`#speedwrite-${currentCounter}`).css('border', '1px solid rgba(241, 196, 15,1.0)')
+            $('#inputWrite').keyup(function(e) {
+                let inputText = $(this).val()
+
+                if(inputText == splittedText[currentCounter]) {
+                    $(`#speedwrite-${currentCounter}`).css('border', '1px solid rgba(52, 152, 219,0.4)')
+                }
+
+                if(e.keyCode == 32 || e.keyCode == 8 || e.keyCode == 13){
+                    inputText = inputText.replace(/\s/g,'')
+                    if(inputText == splittedText[currentCounter]) {
+                        $(`#speedwrite-${currentCounter}`).css('border', '1px solid rgba(46, 204, 113,1.0)')
+                        $('#inputWrite').val('')
+                        currentCounter++
+                        $(`#speedwrite-${currentCounter}`).css('border', '1px solid rgba(241, 196, 15,1.0)')
+                        $(`#speedwrite-${currentCounter}`).attr('placeholder', splittedText[currentCounter]) // no funciona
+                        console.log(splittedText[currentCounter])
+                    } else {
+                        $('#inputWrite').val('')
+                        $(`#speedwrite-${currentCounter}`).css('border', '1px solid rgba(231, 76, 60,1.0)')
+                        toastr.error(insultos[rand(0,insultos.length)])
+                    }
+                }
+
+            })
+            console.log(data)
+        })
+
+        rand = function(min, max) {
+        if (min==null && max==null)
+            return 0;    
+        
+        if (max == null) {
+            max = min;
+            min = 0;
+        }
+
+        return min + Math.floor(Math.random() * (max - min + 1));
+        };
+    </script>
+</body>
+</html>
